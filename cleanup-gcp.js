@@ -1,6 +1,17 @@
 const { exec } = require("child_process");
 
-function tryDelete(cmd) {
+let toDelete = [];
+
+function deleteResource(cmd) {
+    tryDelete(cmd);
+
+    while (toDelete.length !== 0) {
+        const path = toDelete.pop();
+        tryDeletePath(path);
+    }
+}
+
+function tryDelete(cmd, path='') {
     exec (cmd, (error, stderr, stdout) => {
         if (error) {
             console.log(`error: ${error.message}`);
@@ -8,9 +19,8 @@ function tryDelete(cmd) {
             if (userPath.length === 0) {
                 return;
             }
+            toDelete.push(path);
             tryDeletePath(userPath);
-            // TODO: automatic retry of this one, once we've deleted the whole hierarchy...!?
-            //tryDelete(cmd);
             return;
         }
         if (stderr) {
@@ -38,13 +48,13 @@ function getProjectFromPath(path) {
 }
 
 function getTypeFromPath(path) {
-    const endIndex = path.lastIndexOf('/') - 1;
-    const startIndex = path.lastIndexOf('/', endIndex) + 1;
+    const endIndex = path.lastIndexOf('/');
+    const startIndex = path.lastIndexOf('/', endIndex - 1) + 1;
     return path.slice(startIndex, endIndex).replace(/[\/\n ]/g, '');
 }
 
 function getNameFromPath(path) {
-    return path.slice(path.lastIndexOf('/') + 1, path.length).replace(/[\/\n ]/g, '');
+    return path.slice(path.lastIndexOf('/') + 1).replace(/[\/\n ]/g, '');
 }
 
 function findUserPath(err) {
@@ -65,7 +75,7 @@ function tryDeletePath(path) {
         return false;
     }
     console.log(cmd);
-    tryDelete(cmd);
+    tryDelete(cmd, path);
     return true;
 }
 
@@ -73,25 +83,54 @@ function generateCommand(path) {
     const project = getProjectFromPath(path);
     const type = getTypeFromPath(path);
     const name = getNameFromPath(path);
-    console.log(`project: ${project}`);
-    console.log(`type: ${type}`);
-    console.log(`name: ${name}`);
 
     let cmd = 'gcloud compute ';
 
-    if (type == 'firewalls') {
-        cmd += 'firewall-rules delete ';
-    } else if (type == 'routes') {
-        cmd += 'routes delete '
-    } else if (type == 'networkEndpointGroup') {
-        cmd += 'network-endpoint-groups delete '
-    } else {
-        return '';
+    let addLocationSpec = false;
+
+    switch (type) {
+        case 'firewalls':
+            cmd += 'firewall-rules delete ';
+            break;
+        case 'routes':
+            cmd += 'routes delete ';
+            break;
+        case 'networkEndpointGroups':
+            cmd += 'network-endpoint-groups delete ';
+            addLocationSpec = true;
+            break;
+        case 'backendServices':
+            cmd += 'backend-services delete ';
+            addLocationSpec = true;
+            break;
+        case 'urlMaps':
+            cmd += 'url-maps delete ';
+            break;
+        case 'targetHttpProxies':
+            cmd += 'target-http-proxies delete ';
+            break;
+        case 'targetHttpsProxies':
+            cmd += 'target-https-proxies delete ';
+            break;
+        case 'forwardingRules':
+            cmd += 'forwarding-rules delete ';
+            addLocationSpec = true;
+            break;
+        default:
+            console.log(`Don't know how to delete ${type} - please teach me!`)
+            return '';
     }
 
-    if (path.includes('/zones/')) {
-        cmd += '--zone ';
-        cmd += findPathPart(path, 3) + ' ';
+    if (addLocationSpec) {
+        if (path.includes('/zones/')) {
+            cmd += '--zone ';
+            cmd += findPathPart(path, 3) + ' ';
+        } else if (path.includes('/regions/')) {
+            cmd += '--region ';
+            cmd += findPathPart(path, 3) + ' ';
+        } else if (path.includes('/global/')) {
+            cmd += '--global ';
+        }
     }
 
     cmd += name;
@@ -100,6 +139,6 @@ function generateCommand(path) {
     return cmd;
 }
 
-tryDelete('gcloud compute networks delete rich-dev21-west3 --quiet');
+deleteResource('gcloud compute networks delete rich-dev21-west3 --quiet');
 
-tryDelete('gcloud compute networks delete rich-dev22-west3 --quiet');
+// tryDelete('gcloud compute networks delete rich-dev22-west3 --quiet');
