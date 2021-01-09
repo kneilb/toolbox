@@ -2,32 +2,31 @@ const { exec } = require("child_process");
 
 let toDelete = [];
 
-function deleteResource(cmd) {
-    tryDelete(cmd);
-
-    while (toDelete.length !== 0) {
-        const path = toDelete.pop();
-        tryDeletePath(path);
-    }
-}
-
 function tryDelete(cmd, path='') {
     exec (cmd, (error, stderr, stdout) => {
         if (error) {
-            console.log(`error: ${error.message}`);
-            const userPath = findUserPath(error.message);
-            if (userPath.length === 0) {
-                return;
+            if (path.length === 0) {
+                path = findObjectPath(error.message);
             }
             toDelete.push(path);
+            const userPath = findUserPath(error.message);
+            let msg = `Failed to delete: ${path}`
+            if (userPath) {
+                msg += ` <- ${userPath}`;
+            }
+            console.log(msg);
+            if (userPath.length === 0) {
+                console.log(`Unexpected error: ${error.message}`);
+                return;
+            }
             tryDeletePath(userPath);
             return;
         }
-        if (stderr) {
-            console.log(`stderr: ${stderr}`);
-            return;
+        console.log(`Successfully deleted ${path}`);
+        while (toDelete.length !== 0) {
+            const path = toDelete.pop();
+            tryDeletePath(path);
         }
-        console.log(`stdout: ${stdout}`);
     });
 }
 
@@ -63,8 +62,16 @@ function findUserPath(err) {
     if (found < 0) {
         return '';
     }
-    let user = err.slice(found + searchFor.length);
-    return user.replace(/[' ]/g, '');
+    return err.slice(found + searchFor.length).replace(/[' ]/g, '');
+}
+
+function findObjectPath(err) {
+    const start = err.indexOf(`\'`);
+    const end = err.indexOf('\'', start + 1);
+    if (start < 0 || end < 0) {
+        return '';
+    }
+    return err.slice(start, end).replace(/[' ]/g, '');
 }
 
 function tryDeletePath(path) {
@@ -87,10 +94,19 @@ function generateCommand(path) {
     let cmd = 'gcloud compute ';
 
     let addLocationSpec = false;
+    let includeGlobal = true;
 
     switch (type) {
+        case 'addresses':
+            cmd += 'addresses delete ';
+            addLocationSpec = true;
+            break;
         case 'firewalls':
             cmd += 'firewall-rules delete ';
+            break;
+        case 'routers':
+            cmd += 'routers delete ';
+            addLocationSpec = true;
             break;
         case 'routes':
             cmd += 'routes delete ';
@@ -116,8 +132,17 @@ function generateCommand(path) {
             cmd += 'forwarding-rules delete ';
             addLocationSpec = true;
             break;
+        case 'subnetworks':
+            cmd += 'networks subnets delete ';
+            addLocationSpec = true;
+            break;
+        case 'networks':
+                cmd += 'networks delete ';
+                addLocationSpec = true;
+                includeGlobal = false;
+                break;
         default:
-            console.log(`Don't know how to delete ${type} - please teach me!`)
+            console.warn(`Don't know how to delete ${type} - please teach me!`)
             return '';
     }
 
@@ -128,7 +153,7 @@ function generateCommand(path) {
         } else if (path.includes('/regions/')) {
             cmd += '--region ';
             cmd += findPathPart(path, 3) + ' ';
-        } else if (path.includes('/global/')) {
+        } else if (includeGlobal && path.includes('/global/')) {
             cmd += '--global ';
         }
     }
@@ -139,6 +164,4 @@ function generateCommand(path) {
     return cmd;
 }
 
-deleteResource('gcloud compute networks delete rich-dev21-west3 --quiet');
-
-// tryDelete('gcloud compute networks delete rich-dev22-west3 --quiet');
+tryDelete('gcloud compute networks delete ci-iphe-gcloud-855331 --quiet');
