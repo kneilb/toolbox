@@ -34,12 +34,6 @@ function findPathPart(path, partIndex) {
     return path.slice(startIndex, endIndex).replace(/[\/\n ]/g, '');
 }
 
-function getProjectFromPath(path) {
-    const startIndex = path.indexOf('/') + 1;
-    const endIndex = path.indexOf('/', startIndex)
-    return path.slice(startIndex, endIndex).replace(/[\/\n ]/g, '');
-}
-
 function getTypeFromPath(path) {
     const endIndex = path.lastIndexOf('/');
     const startIndex = path.lastIndexOf('/', endIndex - 1) + 1;
@@ -57,15 +51,6 @@ function findUserPath(err) {
         return '';
     }
     return err.slice(found + searchFor.length).replace(/[' \n\r]/g, '');
-}
-
-function findObjectPath(err) {
-    const start = err.indexOf(`\'`);
-    const end = err.indexOf('\'', start + 1);
-    if (start < 0 || end < 0) {
-        return '';
-    }
-    return err.slice(start, end).replace(/[' ]/g, '');
 }
 
 function tryDeletePath(path) {
@@ -95,8 +80,25 @@ function generateCommand(path) {
             cmd += 'addresses delete ';
             addLocationSpec = true;
             break;
+        case 'backendServices':
+            cmd += 'backend-services delete ';
+            addLocationSpec = true;
+            break;
         case 'firewalls':
             cmd += 'firewall-rules delete ';
+            break;
+        case 'forwardingRules':
+            cmd += 'forwarding-rules delete ';
+            addLocationSpec = true;
+            break;
+        case 'networkEndpointGroups':
+            cmd += 'network-endpoint-groups delete ';
+            addLocationSpec = true;
+            break;
+        case 'networks':
+            cmd += 'networks delete ';
+            addLocationSpec = true;
+            includeGlobal = false;
             break;
         case 'routers':
             cmd += 'routers delete ';
@@ -105,16 +107,9 @@ function generateCommand(path) {
         case 'routes':
             cmd += 'routes delete ';
             break;
-        case 'networkEndpointGroups':
-            cmd += 'network-endpoint-groups delete ';
+        case 'subnetworks':
+            cmd += 'networks subnets delete ';
             addLocationSpec = true;
-            break;
-        case 'backendServices':
-            cmd += 'backend-services delete ';
-            addLocationSpec = true;
-            break;
-        case 'urlMaps':
-            cmd += 'url-maps delete ';
             break;
         case 'targetHttpProxies':
             cmd += 'target-http-proxies delete ';
@@ -122,18 +117,8 @@ function generateCommand(path) {
         case 'targetHttpsProxies':
             cmd += 'target-https-proxies delete ';
             break;
-        case 'forwardingRules':
-            cmd += 'forwarding-rules delete ';
-            addLocationSpec = true;
-            break;
-        case 'subnetworks':
-            cmd += 'networks subnets delete ';
-            addLocationSpec = true;
-            break;
-        case 'networks':
-            cmd += 'networks delete ';
-            addLocationSpec = true;
-            includeGlobal = false;
+        case 'urlMaps':
+            cmd += 'url-maps delete ';
             break;
         default:
             console.warn(`Don't know how to delete ${type} - please teach me!`)
