@@ -1,20 +1,14 @@
 const { exec } = require("child_process");
 
-let toDelete = [];
+let pathsToDelete = [];
 
-function tryDelete(cmd, path='') {
+function tryDelete(cmd, path) {
+    console.log(`Attempting to delete ${path} using: ${cmd}`)
     exec (cmd, (error, stderr, stdout) => {
         if (error) {
-            if (path.length === 0) {
-                path = findObjectPath(error.message);
-            }
-            toDelete.push(path);
+            pathsToDelete.push(path);
+            console.log(`Failed to delete: ${path}`);
             const userPath = findUserPath(error.message);
-            let msg = `Failed to delete: ${path}`
-            if (userPath) {
-                msg += ` <- ${userPath}`;
-            }
-            console.log(msg);
             if (userPath.length === 0) {
                 console.log(`Unexpected error: ${error.message}`);
                 return;
@@ -22,10 +16,10 @@ function tryDelete(cmd, path='') {
             tryDeletePath(userPath);
             return;
         }
-        console.log(`Successfully deleted ${path}`);
-        while (toDelete.length !== 0) {
-            const path = toDelete.pop();
-            tryDeletePath(path);
+
+        console.log(`Successfully deleted: ${path}`);
+        while (pathsToDelete.length !== 0) {
+            tryDeletePath(pathsToDelete.pop());
         }
     });
 }
@@ -62,7 +56,7 @@ function findUserPath(err) {
     if (found < 0) {
         return '';
     }
-    return err.slice(found + searchFor.length).replace(/[' ]/g, '');
+    return err.slice(found + searchFor.length).replace(/[' \n\r]/g, '');
 }
 
 function findObjectPath(err) {
@@ -75,19 +69,19 @@ function findObjectPath(err) {
 }
 
 function tryDeletePath(path) {
-    console.log(`Attempting to delete object at: ${path}`)
-
     const cmd = generateCommand(path);
     if (!cmd) {
         return false;
     }
-    console.log(cmd);
     tryDelete(cmd, path);
     return true;
 }
 
 function generateCommand(path) {
-    const project = getProjectFromPath(path);
+    if (!path) {
+        return;
+    }
+
     const type = getTypeFromPath(path);
     const name = getNameFromPath(path);
 
@@ -137,13 +131,13 @@ function generateCommand(path) {
             addLocationSpec = true;
             break;
         case 'networks':
-                cmd += 'networks delete ';
-                addLocationSpec = true;
-                includeGlobal = false;
-                break;
+            cmd += 'networks delete ';
+            addLocationSpec = true;
+            includeGlobal = false;
+            break;
         default:
             console.warn(`Don't know how to delete ${type} - please teach me!`)
-            return '';
+            return;
     }
 
     if (addLocationSpec) {
@@ -164,4 +158,12 @@ function generateCommand(path) {
     return cmd;
 }
 
-tryDelete('gcloud compute networks delete ci-iphe-gcloud-855331 --quiet');
+function deleteNetwork(name, project='unused') {
+    tryDeletePath(`projects/${project}/global/networks/${name}`);
+}
+
+const args = process.argv.slice(2);
+
+for (let network of args) {
+    deleteNetwork(network);
+}
