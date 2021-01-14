@@ -4,7 +4,7 @@ let pathsToDelete = [];
 
 function tryDelete(cmd, path) {
     console.log(`Attempting to delete ${path} using: ${cmd}`)
-    exec (cmd, (error, stderr, stdout) => {
+    exec(cmd, (error, stderr, stdout) => {
         if (error) {
             pathsToDelete.push(path);
             console.log(`Failed to delete: ${path}`);
@@ -91,6 +91,10 @@ function generateCommand(path) {
             cmd += 'forwarding-rules delete ';
             addLocationSpec = true;
             break;
+        case 'instances':
+            cmd += 'instances delete --delete-disks all '
+            addLocationSpec = true;
+            break;
         case 'networkEndpointGroups':
             cmd += 'network-endpoint-groups delete ';
             addLocationSpec = true;
@@ -121,7 +125,7 @@ function generateCommand(path) {
             cmd += 'url-maps delete ';
             break;
         default:
-            console.warn(`Don't know how to delete ${type} - please teach me!`)
+            console.warn(`Don't know how to delete ${path} (${type}) - please teach me!`)
             return;
     }
 
@@ -143,7 +147,7 @@ function generateCommand(path) {
     return cmd;
 }
 
-function deleteNetwork(name, project='unused') {
+function deleteNetwork(name, project = 'unused') {
     tryDeletePath(`projects/${project}/global/networks/${name}`);
 }
 
